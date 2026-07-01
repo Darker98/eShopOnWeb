@@ -1,0 +1,48 @@
+@page
+@model PlansModel
+@{
+    ViewData["Title"] = "Subscription Plans";
+}
+
+<div class="container">
+    <h1>Subscription Plans</h1>
+
+    @if (Model.ErrorMessage is not null)
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+
+    <div class="row">
+        @foreach (var plan in Model.Plans)
+        {
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">@plan.Name</h5>
+                        <p class="card-text">
+                            $@((plan.PriceInCents / 100m).ToString("N2")) every @plan.IntervalCount @plan.IntervalUnit
+                        </p>
+                        @if (plan.RequiresPaymentMethod)
+                        {
+                            <p class="text-muted">Requires a payment method.</p>
+                        }
+                        <form method="post" asp-page-handler="Subscribe">
+                            <input type="hidden" name="Input.ProductHandle" value="@plan.Handle" />
+                            <div class="form-group">
+                                <label>First name</label>
+                                <input class="form-control" name="Input.FirstName" required />
+                            </div>
+                            <div class="form-group">
+                                <label>Last name</label>
+                                <input class="form-control" name="Input.LastName" required />
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-2">Subscribe</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <p><a asp-page="/Subscriptions/Mine">View my subscriptions</a></p>
+</div>

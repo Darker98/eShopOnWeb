@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.eShopWeb;
 using Microsoft.eShopWeb.ApplicationCore.Interfaces;
+using Microsoft.eShopWeb.Infrastructure.Configuration;
 using Microsoft.eShopWeb.Infrastructure.Data;
 using Microsoft.eShopWeb.Infrastructure.Identity;
 using Microsoft.eShopWeb.Web;
@@ -19,6 +20,7 @@ using Microsoft.eShopWeb.Web.Configuration;
 using Microsoft.eShopWeb.Web.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.eShopWeb.Web.Pages;
+using Microsoft.Extensions.Options;
 using Microsoft.FeatureManagement;
 using Microsoft.IdentityModel.Tokens;
 
@@ -87,6 +89,8 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizePage("/Basket/Checkout");
+    options.Conventions.AuthorizePage("/Subscriptions/Plans");
+    options.Conventions.AuthorizePage("/Subscriptions/Mine");
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services
@@ -186,6 +190,24 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "An error occurred seeding the DB.");
+    }
+
+    var maxioSettings = scopedProvider.GetRequiredService<IOptions<MaxioSettings>>().Value;
+    if (!maxioSettings.SkipStartupValidation)
+    {
+        try
+        {
+            // UC2 startup validation (plan.md): confirm the configured usage component is metered
+            // before any customer-facing usage call is ever attempted. Test hosts set
+            // SkipStartupValidation so the test suite never makes a real outbound call to Maxio (quality-gate.md J5).
+            var billingClient = scopedProvider.GetRequiredService<IBillingClient>();
+            await billingClient.GetMeteredComponentAsync(CancellationToken.None);
+            app.Logger.LogInformation("Maxio metered usage component verified at startup.");
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Could not verify the configured Maxio metered usage component at startup - usage recording will refuse requests until this is fixed.");
+        }
     }
 }
 

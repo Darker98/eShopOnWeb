@@ -1,0 +1,118 @@
+@page
+@model MineModel
+@using System.Linq
+@{
+    ViewData["Title"] = "My Subscriptions";
+}
+
+<div class="container">
+    <h1>My Subscriptions</h1>
+
+    @if (Model.ErrorMessage is not null)
+    {
+        <div class="alert alert-danger">@Model.ErrorMessage</div>
+    }
+    @if (Model.StatusMessage is not null)
+    {
+        <div class="alert alert-success">@Model.StatusMessage</div>
+    }
+
+    @if (!Model.Subscriptions.Any())
+    {
+        <p>You have no subscriptions yet. <a asp-page="/Subscriptions/Plans">Browse plans</a>.</p>
+    }
+
+    @foreach (var sub in Model.Subscriptions)
+    {
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Plan: @sub.Provider.ProductHandle</h5>
+                <p>
+                    State: <strong>@sub.Provider.State</strong> &middot;
+                    Balance: $@((sub.Provider.BalanceInCents / 100m).ToString("N2")) &middot;
+                    Next assessment: @(sub.Provider.NextAssessmentAt?.ToString("g") ?? "n/a")
+                    @if (sub.Provider.CancelAtEndOfPeriod == true)
+                    {
+                        <span class="text-warning">(cancels at end of period)</span>
+                    }
+                </p>
+
+                <h6>Report usage</h6>
+                <form method="post" asp-page-handler="RecordUsage" class="form-inline mb-3">
+                    <input type="hidden" name="Usage.SubscriptionId" value="@sub.SubscriptionId" />
+                    <input type="hidden" name="Usage.IdempotencyKey" value="@Model.Usage.IdempotencyKey" />
+                    <input class="form-control mr-2" type="number" step="1" name="Usage.Quantity" value="1" style="width:6rem" />
+                    <input class="form-control mr-2" type="text" name="Usage.Memo" placeholder="memo (optional)" />
+                    <button type="submit" class="btn btn-secondary">Record usage</button>
+                </form>
+
+                <h6>Lifecycle</h6>
+                <div class="mb-3">
+                    <form method="post" asp-page-handler="Lifecycle" class="d-inline">
+                        <input type="hidden" name="Lifecycle.SubscriptionId" value="@sub.SubscriptionId" />
+                        <input type="hidden" name="Lifecycle.Action" value="Pause" />
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Pause</button>
+                    </form>
+                    <form method="post" asp-page-handler="Lifecycle" class="d-inline">
+                        <input type="hidden" name="Lifecycle.SubscriptionId" value="@sub.SubscriptionId" />
+                        <input type="hidden" name="Lifecycle.Action" value="Resume" />
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Resume</button>
+                    </form>
+                    <form method="post" asp-page-handler="Lifecycle" class="d-inline">
+                        <input type="hidden" name="Lifecycle.SubscriptionId" value="@sub.SubscriptionId" />
+                        <input type="hidden" name="Lifecycle.Action" value="CancelImmediate" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Cancel now</button>
+                    </form>
+                    <form method="post" asp-page-handler="Lifecycle" class="d-inline">
+                        <input type="hidden" name="Lifecycle.SubscriptionId" value="@sub.SubscriptionId" />
+                        <input type="hidden" name="Lifecycle.Action" value="CancelEndOfPeriod" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Cancel at period end</button>
+                    </form>
+                    <form method="post" asp-page-handler="Lifecycle" class="d-inline">
+                        <input type="hidden" name="Lifecycle.SubscriptionId" value="@sub.SubscriptionId" />
+                        <input type="hidden" name="Lifecycle.Action" value="Reactivate" />
+                        <button type="submit" class="btn btn-outline-success btn-sm">Reactivate</button>
+                    </form>
+                </div>
+
+                <h6>Change plan</h6>
+                <form method="post" asp-page-handler="PreviewPlanChange" class="form-inline mb-2">
+                    <input type="hidden" name="PlanChange.SubscriptionId" value="@sub.SubscriptionId" />
+                    <select name="PlanChange.TargetProductHandle" class="form-control mr-2">
+                        @foreach (var plan in Model.Plans.Where(p => p.Handle != sub.Provider.ProductHandle))
+                        {
+                            <option value="@plan.Handle">@plan.Name</option>
+                        }
+                    </select>
+                    <select name="PlanChange.Timing" class="form-control mr-2">
+                        <option value="Now">Now (prorated)</option>
+                        <option value="AtRenewal">At renewal (no proration)</option>
+                    </select>
+                    <button type="submit" class="btn btn-secondary">Preview</button>
+                </form>
+
+                @if (Model.PreviewedSubscriptionId == sub.SubscriptionId)
+                {
+                    <form method="post" asp-page-handler="ConfirmPlanChange" class="form-inline">
+                        <input type="hidden" name="PlanChange.SubscriptionId" value="@sub.SubscriptionId" />
+                        <input type="hidden" name="PlanChange.TargetProductHandle" value="@Model.PlanChange.TargetProductHandle" />
+                        <input type="hidden" name="PlanChange.Timing" value="@Model.PlanChange.Timing" />
+                        @if (Model.Preview is not null)
+                        {
+                            <input type="hidden" name="PlanChange.ExpectedProratedAdjustmentInCents" value="@Model.Preview.ProratedAdjustmentInCents" />
+                            <span class="mr-2">
+                                Prorated adjustment: $@((Model.Preview.ProratedAdjustmentInCents / 100m).ToString("N2")),
+                                payment due: $@((Model.Preview.PaymentDueInCents / 100m).ToString("N2"))
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="mr-2">No proration for this timing - the new price applies at the next renewal.</span>
+                        }
+                        <button type="submit" class="btn btn-primary">Confirm plan change</button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
+</div>

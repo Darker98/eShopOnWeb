@@ -36,6 +36,18 @@ public class TestApiApplication : WebApplicationFactory<AuthenticateEndpoint>
                 .UseApplicationServiceProvider(sp)
                 .Options;
             });
+
+            // No test should make a real outbound call to Maxio (quality-gate.md J5); dummy values
+            // satisfy MaxioSettings' [Required] DataAnnotations so ValidateOnStart doesn't fail the host.
+            services.PostConfigure<Microsoft.eShopWeb.Infrastructure.Configuration.MaxioSettings>(s =>
+            {
+                s.ApiKey = "test-key";
+                s.Subdomain = "test-subdomain";
+                s.ProductFamilyHandle = "test-family";
+                s.DefaultProductHandle = "test-product";
+                s.MeteredComponentHandle = "test-component";
+                s.SkipStartupValidation = true;
+            });
         });
 
         return base.CreateHost(builder);
